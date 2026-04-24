@@ -4,11 +4,23 @@ export const maxDuration = 60;
 
 export async function POST(req: NextRequest) {
   try {
-    const { model, prompt, apiKey } = await req.json();
+    const { model, prompt, apiKey, openAiKey } = await req.json();
 
-    if (!apiKey) {
+    let targetKey = apiKey;
+    if (model === "openai/gpt-5.5") {
+      targetKey = openAiKey || apiKey; // Fallback to openRouter key if openAiKey isn't provided, though OpenAI key is expected
+    }
+
+    if (!targetKey && model !== "openai/gpt-5.5") {
       return NextResponse.json(
-        { error: "API key is required" },
+        { error: "OpenRouter API key is required" },
+        { status: 400 }
+      );
+    }
+
+    if (!targetKey && model === "openai/gpt-5.5") {
+      return NextResponse.json(
+        { error: "OpenAI API key is required for GPT-5.5" },
         { status: 400 }
       );
     }
@@ -27,18 +39,33 @@ The HTML should be a complete document with <!DOCTYPE html>, <html>, <head>, and
 Make the design visually stunning with attention to typography, spacing, colors, and micro-interactions.
 Do NOT include any explanation, markdown, or code fences - ONLY output the raw HTML code.`;
 
+    let endpoint = "https://openrouter.ai/api/v1/chat/completions";
+    let headers: Record<string, string> = {
+      Authorization: `Bearer ${targetKey}`,
+      "Content-Type": "application/json",
+      "HTTP-Referer": "https://vibe-check.app",
+      "X-Title": "Vibe Check - AI UI Arena",
+    };
+    
+    let requestModel = model;
+    
+    // Direct OpenAI API integration for GPT-5.5
+    if (model === "openai/gpt-5.5") {
+      endpoint = "https://api.openai.com/v1/chat/completions";
+      headers = {
+        Authorization: `Bearer ${targetKey}`,
+        "Content-Type": "application/json",
+      };
+      requestModel = "gpt-5.5";
+    }
+
     const response = await fetch(
-      "https://openrouter.ai/api/v1/chat/completions",
+      endpoint,
       {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-          "HTTP-Referer": "https://vibe-check.app",
-          "X-Title": "Vibe Check - AI UI Arena",
-        },
+        headers,
         body: JSON.stringify({
-          model,
+          model: requestModel,
           messages: [
             { role: "system", content: systemPrompt },
             { role: "user", content: prompt },
@@ -55,7 +82,7 @@ Do NOT include any explanation, markdown, or code fences - ONLY output the raw H
         {
           error:
             errorData?.error?.message ||
-            `OpenRouter API error: ${response.status}`,
+            `API error: ${response.status}`,
         },
         { status: response.status }
       );

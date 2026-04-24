@@ -26,6 +26,7 @@ const FEATURED_MODELS = [
   "anthropic/claude-opus-4",
   "google/gemini-2.5-pro-preview",
   "google/gemini-2.5-flash-preview",
+  "openai/gpt-5.5",
   "openai/gpt-4.1",
   "openai/gpt-4.1-mini",
   "openai/gpt-4.1-nano",
@@ -76,12 +77,29 @@ export async function GET() {
           completion: m.pricing?.completion || "0",
         },
         provider: m.id.split("/")[0],
-      }))
-      .sort((a: { isFeatured: boolean; created: number }, b: { isFeatured: boolean; created: number }) => {
-        if (a.isFeatured && !b.isFeatured) return -1;
-        if (!a.isFeatured && b.isFeatured) return 1;
-        return b.created - a.created;
+      }));
+
+    // Inject GPT-5.5 if it isn't already present
+    if (!textModels.find((m) => m.id === "openai/gpt-5.5")) {
+      textModels.push({
+        id: "openai/gpt-5.5",
+        name: "GPT-5.5 (OpenAI)",
+        created: Date.now(),
+        contextLength: 200000,
+        isFeatured: true,
+        pricing: {
+          prompt: "0",
+          completion: "0",
+        },
+        provider: "openai",
       });
+    }
+
+    textModels.sort((a: { isFeatured: boolean; created: number }, b: { isFeatured: boolean; created: number }) => {
+      if (a.isFeatured && !b.isFeatured) return -1;
+      if (!a.isFeatured && b.isFeatured) return 1;
+      return b.created - a.created;
+    });
 
     return NextResponse.json({ models: textModels });
   } catch (error: unknown) {
